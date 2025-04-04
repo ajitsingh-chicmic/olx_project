@@ -4,3 +4,4 @@ myenv/
 results/
 .vescode/
 ocr_results/
+*migrations*
