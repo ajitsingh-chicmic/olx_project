@@ -103,5 +103,6 @@ def get_all_message(room_id):
         }
         for msg in messages
     ]
+    #cgcf
 
     return formatted_messages
