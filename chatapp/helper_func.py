@@ -106,3 +106,6 @@ def get_all_message(room_id):
     #cgcf
 
     return formatted_messages
+@database_sync_to_async
+def readed_by_user(room_id,user_id):
+    ReadbyUser.objects.filter(room_id=room_id,user_id=user_id).delete()

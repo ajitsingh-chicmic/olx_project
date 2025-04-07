@@ -43,7 +43,7 @@ async def connect(sid,environ,auth=None):
    
    
    
-    result=await func.get_unread_messages(user['user_id'])
+    
     await so.save_session(sid, {"user_id": user['user_id'], "unread_messages": result})
     
    
@@ -146,9 +146,19 @@ async def send_mesg(sid,data):
 async def join_room(sid,data):
 
     room_id=data['room_id']
+    for room in sio.rooms(sid):
+         if room != sid:
+            await sio.leave_room(sid, room)
     await sio.enter_room(sid=sid,room=room_id)
+   
     messages=await func.get_all_message(room_id)
+    session_data=await so.get_session(sid)
+    user_id=session_data.get('user_id')
+    print(user_id)
+    await func.readed_by_user(room_id,user_id)
+
     await so.emit('retrieve',{"mesages":messages},to=sid)
+   
 
     
 
@@ -157,7 +167,7 @@ async def join_room(sid,data):
 async def unread(sid,data):
     session_data = await so.get_session(sid)  # Retrieve session data
     user_id=session_data.get("user_id")
-    result = session_data.get("unread_messages", []) 
+    result=await func.get_unread_messages(user_id)
     latest_messages = await func.get_latest_messages(user_id)
     
     await so.emit('maxi', {

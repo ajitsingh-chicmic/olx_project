@@ -176,7 +176,7 @@ class FinDetails(APIView):
 
         return Response(dict1, status=status.HTTP_200_OK)   
         
-         
+        
 class PutAd(APIView):
     # authentication_classes = [JWTAuthentication]
     # permission_classes = [IsAuthenticated]
