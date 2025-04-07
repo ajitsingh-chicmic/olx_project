@@ -91,3 +91,17 @@ def get_latest_messages(user_id):
     ).values('room_id', 'message')
 
     return list(messages)
+@database_sync_to_async
+def get_all_message(room_id):
+    
+    messages=MessageInfo.objects.filter(room_id=room_id).values('message','created_at','user_id').order_by('created_at','id')
+    formatted_messages = [
+        {
+            "message": msg["message"],
+            "created_at": msg["created_at"].isoformat(),  
+            "sender_id": msg["user_id"]
+        }
+        for msg in messages
+    ]
+
+    return formatted_messages
