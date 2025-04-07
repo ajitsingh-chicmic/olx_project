@@ -11,6 +11,7 @@ from olx import settings
 from account.models import User
 from rest_framework import status
 from django.db.models import F
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from .serializers import Logindisplayserializer,UserFav,DisplayImageSerializer
 from datetime import datetime
@@ -25,6 +26,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.db import transaction
 from .serializers import carserializer, Bikeserializer, furnitureserializer, Bicycleserializer
+from collections import namedtuple
 
 class Sellproduct(APIView):
     http_method_names = ['post']
@@ -86,15 +88,19 @@ class DisplayAdViewCategory(generics.ListAPIView):
     
     # def list(self, request): http_method_names = ['get']
     def list(self, request):
-        params=request.Get
+        params=request.GET
         try:
             data=request.data
-            page=int(params('page',1))
-            limit=int(params('limit',2))
+            page=int(params.get('page',1))
+            limit=int(params.get('limit',2))
             offset=getoffset(page,limit)
 
             
-            products=Products.objects.filter(name__icontains=data["search"]).filter(availability="Sold")[offset:limit+offset]
+            products=Products.objects.filter(Q(name__icontains=data["search"])|Q(category__category_type__icontains=data["search"])|
+                                             Q(description__icontains=data["search"])|Q(subcategory__subcategory_name__icontains=data["search"])).filter(availability="Sold")[offset:limit+offset]
+            # products1=Products.objects.filter(Category__category_type__icontains=data["search"]).filter(availability="Sold")[offset:limit+offset]
+            # products2=Products.objects.filter(description__icontains=data["search"]).filter(availability="Sold")[offset:limit+offset]
+            # products3=Products.objects.filter(Subcategory__subcategory_name__icontains=data["search"]).filter(availability="Sold")[offset:limit+offset]
             # print(products)
             product_list=displayAdSerializer(products,many=True)
             product_data=product_list.data
@@ -433,7 +439,12 @@ class Productdetail(APIView):
         id=params.get('id')
         try:
             product=Products.objects.get(id=id)
-            image=Images.objects.filter(P=product)
+            image=list(Images.objects.filter(P=product))
+
+            print(type(image))
+            extra_image=namedtuple('image',['P','image'])
+            image.insert(0,extra_image(image=product.display_photo,P=product))
+           
             product_serializer=displayAdSerializer(product)
             image_serializer=DisplayImageSerializer(image,many=True)
             
@@ -682,9 +693,10 @@ class Filter2(APIView):
                 ProductSubcategoryDetails.objects.filter(
                     Product=OuterRef("id"),
                     subcategorydetails__title="brand"
-                ).values("value")[:1]  
+                ).values("value") #[:1]
             )
         )
+        print(dbQuery)
 
         
         if brand:
@@ -699,6 +711,7 @@ class Filter2(APIView):
             available_brands = ProductSubcategoryDetails.objects.filter(
                 subcategorydetails__category=category
             )
+           
             if subcategory:
                 available_brands = available_brands.filter(
                     subcategorydetails__subcategory=subcategory
