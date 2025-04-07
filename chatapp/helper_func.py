@@ -25,6 +25,7 @@ def get_other_user(room_id, sender):
     user = GroupUser.objects.filter(room_id=room_id).exclude(user_id=sender).first()
     user1=User.objects.get(email=user.user_id)
     return {"id": user1.id, "user_id": user1.email} if user else None
+
 @database_sync_to_async
 def verify_token(token):
    
@@ -34,6 +35,7 @@ def verify_token(token):
         return decoded  
     except InvalidTokenError:
         return None
+    
 @database_sync_to_async
 def get_unread_messages(user_id):
     return list(

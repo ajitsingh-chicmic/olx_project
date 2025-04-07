@@ -94,10 +94,11 @@ class DisplayAdViewCategory(generics.ListAPIView):
             page=int(params.get('page',1))
             limit=int(params.get('limit',2))
             offset=getoffset(page,limit)
+            search=data["search"].strip()
 
             
-            products=Products.objects.filter(Q(name__icontains=data["search"])|Q(category__category_type__icontains=data["search"])|
-                                             Q(description__icontains=data["search"])|Q(subcategory__subcategory_name__icontains=data["search"])).filter(availability="Sold")[offset:limit+offset]
+            products=Products.objects.filter(Q(name__icontains=search)|Q(category__category_type__icontains=search)|
+                                             Q(description__icontains=search)|Q(subcategory__subcategory_name__icontains=search)).filter(availability="Sold")[offset:limit+offset]
             # products1=Products.objects.filter(Category__category_type__icontains=data["search"]).filter(availability="Sold")[offset:limit+offset]
             # products2=Products.objects.filter(description__icontains=data["search"]).filter(availability="Sold")[offset:limit+offset]
             # products3=Products.objects.filter(Subcategory__subcategory_name__icontains=data["search"]).filter(availability="Sold")[offset:limit+offset]
