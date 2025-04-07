@@ -147,6 +147,12 @@ async def join_room(sid,data):
 
     room_id=data['room_id']
     await sio.enter_room(sid=sid,room=room_id)
+    messages=await func.get_all_message(room_id)
+    await so.emit('retrieve',{"mesages":messages},to=sid)
+
+    
+
+
 @so.on('unread_message')
 async def unread(sid,data):
     session_data = await so.get_session(sid)  # Retrieve session data
