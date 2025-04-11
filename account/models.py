@@ -81,12 +81,12 @@ class User(AbstractBaseUser):
 #          email=models.EmailField()
 class UserProfile(models.Model):
     user=models.ForeignKey(User,on_delete=models.CASCADE)
-    first_name=models.CharField(max_length=100)
-    last_name=models.CharField(max_length=200,null=True)
-    age=models.IntegerField(null=True)
-    date_of_birth=models.DateField(null=True)
+    
+    
+    
+    
     about=models.TextField(null=True)
-    phone_number=models.CharField(max_length=10,validators=[RegexValidator(regex=r'^\d{10}$', message="Phone number must be 10 digits long")])
+    
 
 
 

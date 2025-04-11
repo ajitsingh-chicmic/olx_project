@@ -43,15 +43,21 @@ INSTALLED_APPS = [
     
     'categories',
     'chatapp',
-    
+    'maintenance',
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'algoliasearch_django',
     'corsheaders',
+    'django_celery_beat',
+    'django_celery_results'
 ]
+CELERY_BROKER_URL = 'django-db'
+CELERY_RESULT_BACKEND = 'django-db'
 
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -66,9 +72,9 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
-    # 'DEFAULT_PERMISSION_CLASSES': (
-    #     'rest_framework.permissions.IsAuthenticated',
-    # ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.AllowAny',
+    ),
 
 }
 CORS_ALLOW_ALL_ORIGINS = True
@@ -158,8 +164,8 @@ from datetime import timedelta
 ...
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=5),
+    "REFRESH_TOKEN_LIFETIME": timedelta(minutes=60),
     "ROTATE_REFRESH_TOKENS": False,
     "BLACKLIST_AFTER_ROTATION": False,
     "UPDATE_LAST_LOGIN": False,
@@ -209,3 +215,4 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'categories', 'media') 
 import socketio
 sio = socketio.AsyncServer(async_mode = 'asgi', cors_allowed_origins='*')
+FRONTEND_BASE_URL = "https://f43e-112-196-113-3.ngrok-free.app/"

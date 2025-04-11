@@ -8,7 +8,7 @@ from .models import Products,car,Furniture,Bike,Bicycle,Category,Subcategory,Ima
 from rest_framework.response import Response
 from django.db import transaction
 from olx import settings
-from account.models import User
+from account.models import User,UserProfile
 from rest_framework import status
 from django.db.models import F
 from django.db.models import Q
@@ -22,11 +22,12 @@ from django.db.models import Subquery, OuterRef
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,AllowAny
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.db import transaction
 from .serializers import carserializer, Bikeserializer, furnitureserializer, Bicycleserializer
 from collections import namedtuple
+from .authentication import SafeJWTAuthentication
 
 class Sellproduct(APIView):
     http_method_names = ['post']
@@ -82,19 +83,44 @@ class Sellproduct(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-class DisplayAdViewCategory(generics.ListAPIView):
+class DisplayAdViewCategory(APIView):
     http_method_names = ['get']
-    
+    authentication_classes=[SafeJWTAuthentication]
+    permission_classes=[AllowAny]
+    # def get_queryset(self,products):
+    #     try:
+    #         params = self.request.GET
+    #         page = int(params.get('page', 1))
+    #         if page<=0:
+    #             page=1
+            
+    #         limit = int(params.get('limit', 30))
+    #         # page = 1
+    #         # limit = 10
+    #         offset = getoffset(page, limit)
+
+            
+    #         queryset = products.order_by('-created_at')[offset:limit + offset]
+
+    #         return queryset
+    #     except Exception as e:
+            
+    #         print(f"Error in get_queryset: {e}")
+    #         return Products.objects.none() 
     
     # def list(self, request): http_method_names = ['get']
-    def list(self, request):
+
+    def get(self, request):
         params=request.GET
+        user_id=request.user.id
         try:
             data=request.data
             page=int(params.get('page',1))
             limit=int(params.get('limit',2))
             offset=getoffset(page,limit)
-            search=data["search"].strip()
+            search=params.get('search'," ").strip()
+           
+            
 
             
             products=Products.objects.filter(Q(name__icontains=search)|Q(category__category_type__icontains=search)|
@@ -103,8 +129,20 @@ class DisplayAdViewCategory(generics.ListAPIView):
             # products2=Products.objects.filter(description__icontains=data["search"]).filter(availability="Sold")[offset:limit+offset]
             # products3=Products.objects.filter(Subcategory__subcategory_name__icontains=data["search"]).filter(availability="Sold")[offset:limit+offset]
             # print(products)
-            product_list=displayAdSerializer(products,many=True)
-            product_data=product_list.data
+            if search.lower()=="null":
+                products=Products.objects.filter(availability="Sold")[offset:limit+offset]
+            # print(products)
+            # queryset=self.get_queryset(products)
+           
+            if   request.user.is_authenticated:
+                
+                queryset=Logindisplayserializer(products,context = {'user':user_id},many=True)
+                product_data = queryset.data
+            else:
+                queryset = displayAdSerializer(products, many=True)
+               
+                product_data = queryset.data
+            product_data=queryset.data
             return Response(data=product_data,status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"Error Occured":f"{e}"},status=status.HTTP_400_BAD_REQUEST)
@@ -260,54 +298,70 @@ class PutAd(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 class Updatedetails(APIView):
+    http_method_names = ['post']
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            user = request.user
+            data = request.data
+            keys = list(data.keys())
+
+            product_data = {}
+            title_data = {}
+
+            product_fields = ['name', 'price', 'description', 'status', 'state', 'city', 'district', 'availabilty']
+            for key in keys:
+                if key in product_fields:
+                    product_data[key] = data[key]
+                elif key != 'id':  
+                    title_data[key] = data[key]
+
+            product_id = data.get('id')
+            if not product_id:
+                return Response({'error': 'Product ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            product = get_object_or_404(Products, id=product_id)
+
+           
+            for key, value in product_data.items():
+                setattr(product, key, value)
+            product.save()
+
+           
+            product_subcategory_details = ProductSubcategoryDetails.objects.filter(Product_id=product_id)
+            for pid in product_subcategory_details:
+                subcat = pid.subcategorydetails
+                if subcat.title in title_data:
+                    pid.value = title_data[subcat.title]
+                    pid.save()
+
+            return Response({'message': 'Product updated successfully'}, status=status.HTTP_200_OK)
+
+        except Products.DoesNotExist:
+            return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': f'An unexpected error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    
+class UserLikes(APIView):
     http_method_names=['post']
     authentication_classes=[JWTAuthentication]
     permission_classes=[IsAuthenticated]
     def post(self,request):
-        user=User.objects.get(id=request.user.id)
-        data=request.data
-        keys = [k for k in data.keys()]
-        product_data={}
-        title_data={}
-        product_list=['id','category','subcategory','name','price','description','status','state','city','district','availabilty']
-        for k in keys:
-            if k in product_list:
-                product_data[k]=data[k]
-            else:
-                title_data[k]=data[k]
-        product_id = data.get('id') 
-        product = get_object_or_404(Products, id=product_id) 
-        for key, value in product_data.items():
-            setattr(product, key, value)
-        product.save()
-        print(title_data)
-        for key in title_data:
-            product_subcategory_details = ProductSubcategoryDetails.objects.filter(Product_id=product_id)
-            for pid in product_subcategory_details:
-                subcat=pid.subcategorydetails
-                print(subcat.title)
-                if subcat.title==key:
-                    pid.value=title_data[key]
-                    pid.save()
-
-
-        return Response({'message': 'Product updated successfully'})
-    
-class UserLikes(APIView):
-    http_method_names=['post']
-    # authentication_classes=[JWTAuthentication]
-    # permission_classes=[IsAuthenticated]
-    def post(self,request):
         data=request.data
         print(request.data)
-        user=User.objects.get(id=data['id'])
+        # user=User.objects.get(id=data['id'])
+
+
         productdata=Products.objects.get(id=data['product_id'])
         if UserFavourites.objects.filter(product=productdata).exists():
             user=UserFavourites.objects.filter(product=productdata)
             user.delete()
             return Response({'msg':'Removed from Wishlist'})
         else:
-            user_favourites=UserFavourites.objects.create(user=user,product=productdata)
+            user_favourites=UserFavourites.objects.create(user=request.user,product=productdata)
             return Response({'msg':'Added in Favourites'})
 
 
@@ -370,8 +424,9 @@ def getoffset(page,limit):
 #             return Response(data=product_data,status=status.HTTP_200_OK)
 #         except Exception as e:
 #             return Response({"Error Occured":f"{e}"},status=status.HTTP_400_BAD_REQUEST)
-class displayAllAdView(generics.ListAPIView):
+class displayAllAdView(APIView):
     http_method_names = ['get']
+    authentication_classes=[JWTAuthentication]
     serializer_class = displayAdSerializer  
     pagination_class = None  
 
@@ -395,16 +450,17 @@ class displayAllAdView(generics.ListAPIView):
          
             print(f"Error in get_queryset: {e}")
             return Products.objects.none()  
-    def list(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
+        user_id=request.user.id
         
         try:
            
             queryset = self.get_queryset()
 
          
-            if not  request.user.is_authenticated:
+            if   request.user.is_authenticated:
                 
-                product_list=Logindisplayserializer(queryset,context = {'user':1},many=True)
+                product_list=Logindisplayserializer(queryset,context = {'user':user_id},many=True)
                 product_data = product_list.data
             else:
                 product_list = displayAdSerializer(queryset, many=True)
@@ -422,12 +478,12 @@ class displayAllAdView(generics.ListAPIView):
 
 class FindUserFavourites(APIView):
     http_method_names=['get']
-    # authentication_classes=[JWTAuthentication]
-    # permission_classes=[IsAuthenticated]
+    authentication_classes=[JWTAuthentication]
+    permission_classes=[IsAuthenticated]
     def get(self,request):
-        params = request.GET
-        print(params["id"])
-        fav_info=UserFavourites.objects.filter(user=User.objects.get(id=int(params.get('id', 1))))
+        user=request.user
+        # print(params["id"])
+        fav_info=UserFavourites.objects.filter(user=user.id)
         serializer=UserFav(fav_info,many=True)
         data=serializer.data
         # data['is_favorite']=True
@@ -455,6 +511,7 @@ class Productdetail(APIView):
             return Response(data=response_data,status=status.HTTP_200_OK)
         except Products.DoesNotExist:
             return Response({'msg':'Product not exist'},status=status.HTTP_404_NOT_FOUND) 
+        
 class ViewbyCategory(APIView):
     http_method_names = ['get']
     
@@ -645,6 +702,9 @@ class Filters(APIView):
 
 class Filter2(APIView):
     http_method_names=['post']
+    authentication_classes=[SafeJWTAuthentication]
+    permission_classes=[AllowAny]
+    
     def get_queryset(self,Products):
         try:
             params = self.request.GET
@@ -675,18 +735,25 @@ class Filter2(APIView):
         min_price = price[0]
         max_price = price[1]
             
-       
-        category=Category.objects.get(category_type=category)
+        try:
+            category=Category.objects.get(category_type=category)
+        except :
+            return Response({"msg":"Not a Valid Category"},status=status.HTTP_400_BAD_REQUEST)
         
         dbQuery = Products.objects.filter(category=category)
+        # print(dbQuery)
 
        
         dbQuery = dbQuery.filter(price__range=(min_price, max_price))
+        # print(dbQuery)
 
         
         if subcategory:
-            subcategory=Subcategory.objects.get(subcategory_name=subcategory)
-            dbQuery = dbQuery.filter(subcategory=subcategory)
+            try:
+                subcategory=Subcategory.objects.get(subcategory_name=subcategory)
+                dbQuery = dbQuery.filter(subcategory=subcategory)
+            except :
+                return Response({"msg":"Not a Valid Subcategory"},status=status.HTTP_400_BAD_REQUEST)
 
         
         dbQuery = dbQuery.annotate(
@@ -697,7 +764,7 @@ class Filter2(APIView):
                 ).values("value") #[:1]
             )
         )
-        print(dbQuery)
+        # print(dbQuery)
 
         
         if brand:
@@ -726,6 +793,7 @@ class Filter2(APIView):
 
         
         products = dbQuery.distinct()
+        count=dbQuery.count()
         queryset=self.get_queryset(products)
         
         subcategory_counts = (
@@ -740,17 +808,56 @@ class Filter2(APIView):
             .values_list("value", flat=True)
             .distinct()
             )
-        
-        product_list =Logindisplayserializer(queryset, context={'user': 1}, many=True).data
+        if   request.user.is_authenticated:
+                print('user is authenticated')
+                
+                product_list=Logindisplayserializer(queryset,context = {'user':request.user.id},many=True)
+                product_data = product_list.data
+        else:
+                product_list = displayAdSerializer(queryset, many=True)
+               
+                product_data = product_list.data
+
 
 
         product_data = {
-                "products": product_list,  
+                "products": product_data,  
                 "subcategories": list(subcategory_counts),  
-                "Brand":distinct_values
+                "Brand":distinct_values,
+                "count":count
             }
 
         return Response(data=product_data, status=status.HTTP_200_OK)
+        
+
+
+# class DeletePost(APIView):
+#     http_method_names=['get']
+#     authentication_classes=[JWTAuthentication]
+
+#     def get(self,request):
+
+class DeleteAds(APIView):
+    http_method_names=['get']
+    authentication_classes=[JWTAuthentication]
+    permission_classes=[IsAuthenticated]
+    def get(self,request):
+        user=request.user
+        params=request.GET
+        product_id=params.get('id')
+        try:
+            product=Products.objects.get(id=product_id,user=user)
+            product.delete()
+            return Response({'msg':'Product Deleted Successfully'},status=status.HTTP_200_OK)
+        except:
+            return Response({'msg':'Id is not Valid '},status=status.HTTP_400_BAD_REQUEST)   
+
+
+        
+        
+
+
+
         
 
 

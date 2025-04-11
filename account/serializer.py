@@ -7,18 +7,19 @@ from django.contrib.auth import authenticate
 
 
 class signupSerializer(ModelSerializer):
-    password2=serializers.CharField(max_length=255)
+   
     class Meta:
         model=User
-        fields=["username","email","password","password2"]
-    def validate(self, attrs):
-        password1=attrs.get("password")
-        password2=attrs.get("password2")
-        if password1!=password2:
-            raise ValidationError("Confirm password and password must be same")
-        return attrs
+        fields=["username","email","password"]
+            
+    # def validate(self, attrs):
+    #     password1=attrs.get("password")
+    #     password2=attrs.get("password2")
+    #     if password1!=password2:
+    #         raise ValidationError("Confirm password and password must be same")
+    #     return attrs
     def create(self, validated_data):
-        validated_data.pop("password2")
+        
         user = User.objects.create_user(**validated_data)  # Corrected: Use the manager's create_user method
         return user
 
@@ -40,7 +41,7 @@ class LoginSerializer(serializers.Serializer):
         
         email = attrs.get('email')
         password = attrs.get('password')
-        print(password)
+        
 
         if not email or not  password:
             
@@ -99,7 +100,17 @@ class editprofileSerializer(serializers.ModelSerializer):
         fields = ['user', 'first_name', 'last_name', 'age', 'date_of_birth', 'about', 'phone_number']
     
     def create(self, validated_data):
-        # Optionally, you can customize the creation logic if needed
+        if UserProfile.objects.filter(user=validated_data['user']).exists():
+            user=UserProfile.objects.filter(user=validated_data['user'])
+            user.delete()
         return UserProfile.objects.create(**validated_data)
+class Userserializer(serializers.ModelSerializer):
+    class Meta:
+        model=User
+        fields=['username','email','phonenumber','is_verified']
+            
+
+         
+        
 
         
